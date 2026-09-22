@@ -1,0 +1,66 @@
+name: Stage 7 CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build backend image
+        run: |
+          docker build \
+            -f Dockerfile.backend \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/chatbot-backend:latest .
+
+      - name: Push backend image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/chatbot-backend:latest
+
+      - name: Build frontend image
+        run: |
+          docker build \
+            -f Dockerfile.chatbot \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/chatbot-frontend:latest .
+
+      - name: Push frontend image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/chatbot-frontend:latest
+
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure VM
+        run: |
+          az vm run-command invoke \
+            --resource-group "DEV-DEV-STAGE7-L75-37O" \
+            --name "dev-web-vm-37o" \
+            --command-id RunShellScript \
+            --scripts '
+              cd /home/azureuser/stage7-app
+              git pull origin main
+              docker-compose pull
+              docker-compose down
+              docker-compose up -d
+              docker-compose ps
+            '
