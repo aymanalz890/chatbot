@@ -1,41 +1,59 @@
+version: "3.8"
+
 services:
-  chromadb:
-    image: chromadb/chroma
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    volumes:
-      - chromadb_data:/chroma/chroma
 
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
+    image: ${DOCKERHUB_USERNAME}/chatbot-backend:latest
+    container_name: chatbot-backend
     restart: unless-stopped
+
     env_file:
       - .env
-    environment:
-      CHROMA_HOST: chromadb
-      CHROMA_PORT: 8000
+
     ports:
       - "5000:5000"
+
     depends_on:
       - chromadb
-    volumes:
-      - ./chat_logs:/app/chat_logs
-      - ./pdf_store:/app/pdf_store
+
+    networks:
+      - chatbot-network
+
 
   chatbot:
-    build:
-      context: .
-      dockerfile: Dockerfile.chatbot
+    image: ${DOCKERHUB_USERNAME}/chatbot-frontend:latest
+    container_name: chatbot-frontend
     restart: unless-stopped
-    environment:
-      BACKEND_URL: http://backend:5000
+
     ports:
       - "8501:8501"
+
     depends_on:
       - backend
 
+    networks:
+      - chatbot-network
+
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - chroma_data:/chroma/chroma
+
+    networks:
+      - chatbot-network
+
+
+networks:
+  chatbot-network:
+    driver: bridge
+
+
 volumes:
-  chromadb_data:
+  chroma_data:
